@@ -277,4 +277,4 @@ if __name__ == '__main__':
     print(f"📝 Access admin panel at http://localhost:5001")
     print("=" * 60)
     
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=8006, debug=True)
