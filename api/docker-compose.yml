@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  agamscan-api:
+    build: .
+    container_name: agamscan-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Load from .env file
+      - AZURE_VISION_KEY=${AZURE_VISION_KEY}
+      - AZURE_VISION_ENDPOINT=${AZURE_VISION_ENDPOINT}
+      - AZURE_AI_ENDPOINT=${AZURE_AI_ENDPOINT}
+      - AZURE_AI_KEY=${AZURE_AI_KEY}
+      - AZURE_AI_MODEL_NAME=${AZURE_AI_MODEL_NAME}
+      - YOLO_MODEL_PATH=${YOLO_MODEL_PATH}
+      - BLUR_VARIANCE_THRESH=${BLUR_VARIANCE_THRESH}
+      - GLARE_RATIO_THRESH=${GLARE_RATIO_THRESH}
+      - FINGER_CURVATURE_THRESH=${FINGER_CURVATURE_THRESH}
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    volumes:
+      # Mount YOLO model
+      - ${YOLO_MODEL_PATH}:${YOLO_MODEL_PATH}
+      # Mount output directory
+      - ./outputs:/app/outputs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

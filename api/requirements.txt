@@ -1,0 +1,53 @@
+# FastAPI and server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Flask (for admin panel)
+flask==3.0.0
+
+# Azure SDKs
+azure-ai-vision-imageanalysis==1.0.0b2
+azure-ai-inference==1.0.0b1
+azure-core==1.29.6
+
+# Computer Vision
+opencv-python==4.9.0.80
+numpy==1.24.3
+mediapipe==0.10.9
+
+# YOLO
+ultralytics==8.1.18
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.3
+
+# Optional: For development
+# pytest==7.4.3
+# httpx==0.26.0
+
+
+
+
+
+## cloud
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Azure SDKs
+azure-ai-vision-imageanalysis
+azure-ai-inference
+azure-core
+
+# Computer Vision
+opencv-python
+numpy
+
+# YOLO
+ultralytics
+
+# Utilities
+python-dotenv
+pydantic
