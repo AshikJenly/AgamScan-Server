@@ -341,10 +341,12 @@ async def process_document(
         print(f"   {glare_msg} (checked on cropped card)")
         
         # Finger check - on original polygon with full image for hand detection
+        # Pass is_final parameter to control detection method
         finger_passed, finger_score, finger_msg, finger_metrics = finger_checker.check(
             polygon,
             image.shape,
-            image  # Pass full image for MediaPipe hand detection
+            image,  # Pass full image for MediaPipe hand detection
+            is_final=is_final  # If True, only use MediaPipe; if False, use hybrid detection
         )
         print(f"   {finger_msg}")
         if finger_metrics:
@@ -403,6 +405,7 @@ async def process_document(
                 "timestamp": datetime.now().isoformat(),
                 "processing_time_ms": (time.time() - start_time) * 1000,
                 "detection_confidence": detection_confidence,
+                "is_final": is_final,
                 "quality_checks": {
                     "blur": {"passed": blur_passed, "score": blur_score, "threshold": config.BLUR_VARIANCE_THRESH},
                     "glare": {"passed": glare_passed, "score": glare_score, "threshold": config.GLARE_RATIO_THRESH},
@@ -605,6 +608,7 @@ async def process_document(
             "timestamp": datetime.now().isoformat(),
             "processing_time_ms": processing_time,
             "detection_confidence": detection_confidence,
+            "is_final": is_final,
             "quality_checks": {
                 "blur": {"passed": blur_passed, "score": blur_score, "threshold": config.BLUR_VARIANCE_THRESH},
                 "glare": {"passed": glare_passed, "score": glare_score, "threshold": config.GLARE_RATIO_THRESH},

@@ -3,15 +3,25 @@ Admin Panel for AgamScan
 Monitors all request logs, images, and pipeline outputs
 """
 
-from flask import Flask, render_template, jsonify, send_file, request
+from flask import Flask, render_template, jsonify, send_file, request, session, redirect, url_for
 from pathlib import Path
 import json
 from datetime import datetime
 import os
 from typing import List, Dict, Any
 import base64
+from functools import wraps
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'agamscan-admin-secret-key-2026')  # Change this in production
+
+# Admin credentials from .env
+ADMIN_USER = os.getenv('USER', 'agamadmin')
+ADMIN_PASSWORD = os.getenv('PASSWORD', 'agampassword')
 
 # Configuration
 OUTPUTS_DIR = Path("outputs")
@@ -21,6 +31,16 @@ FAILED_DIR = OUTPUTS_DIR / "failed"
 
 # Ensure directories exist
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 class AdminMonitor:
@@ -71,6 +91,9 @@ class AdminMonitor:
                     log_data['status'] = status_label
                     log_data['directory'] = str(directory)
                     log_data['timestamp'] = log_data.get('timestamp', datetime.fromtimestamp(json_file.stat().st_mtime).isoformat())
+                    
+                    # Extract is_final flag if present
+                    log_data['is_final'] = log_data.get('is_final', None)
                     
                     # Get corresponding image file (same name but .jpg)
                     image_file = json_file.with_suffix('.jpg')
@@ -125,6 +148,9 @@ class AdminMonitor:
                     log_data['request_id'] = request_id
                     log_data['directory'] = str(directory)
                     log_data['timestamp'] = log_data.get('timestamp', datetime.fromtimestamp(json_file.stat().st_mtime).isoformat())
+                    
+                    # Extract is_final flag
+                    log_data['is_final'] = log_data.get('is_final', None)
                     
                     # Extract OCR and NER results if available
                     if 'ocr_result' in log_data:
@@ -204,13 +230,48 @@ class AdminMonitor:
 
 # ============= API Routes =============
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page"""
+    if request.method == 'POST':
+        data = request.get_json() if request.is_json else request.form
+        username = data.get('username')
+        password = data.get('password')
+        
+        if username == ADMIN_USER and password == ADMIN_PASSWORD:
+            session['logged_in'] = True
+            session['username'] = username
+            if request.is_json:
+                return jsonify({'success': True, 'message': 'Login successful'})
+            return redirect(url_for('index'))
+        else:
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+            return render_template('login.html', error='Invalid credentials')
+    
+    # If already logged in, redirect to index
+    if 'logged_in' in session:
+        return redirect(url_for('index'))
+    
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    """Logout"""
+    session.clear()
+    return redirect(url_for('login'))
+
+
 @app.route('/')
+@login_required
 def index():
     """Main admin panel page"""
-    return render_template('admin.html')
+    return render_template('admin.html', username=session.get('username'))
 
 
 @app.route('/api/requests')
+@login_required
 def get_requests():
     """Get all requests (with optional filtering)"""
     limit = int(request.args.get('limit', 100))
@@ -221,6 +282,7 @@ def get_requests():
 
 
 @app.route('/api/request/<request_id>')
+@login_required
 def get_request_detail(request_id):
     """Get detailed information for a specific request"""
     details = AdminMonitor.get_request_details(request_id)
@@ -230,6 +292,7 @@ def get_request_detail(request_id):
 
 
 @app.route('/api/statistics')
+@login_required
 def get_statistics():
     """Get overall statistics"""
     stats = AdminMonitor.get_statistics()
