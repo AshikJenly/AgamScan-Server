@@ -13,15 +13,23 @@ import base64
 from functools import wraps
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from parent directory
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'agamscan-admin-secret-key-2026')  # Change this in production
 
 # Admin credentials from .env
-ADMIN_USER = os.getenv('USER', 'agamadmin')
-ADMIN_PASSWORD = os.getenv('PASSWORD', 'agampassword')
+ADMIN_USER = os.getenv('ADMIN_USER', 'agamadmin')
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'agampassword')
+
+print(f"🔐 Admin credentials loaded:")
+print(f"   ADMIN_USER from env: {ADMIN_USER}")
+print(f"   ADMIN_PASSWORD from env: {'*' * len(ADMIN_PASSWORD) if ADMIN_PASSWORD else 'NOT SET'}")
+print(f"   .env path: {env_path}")
+print(f"   .env exists: {env_path.exists()}")
+
 
 # Configuration
 OUTPUTS_DIR = Path("outputs")
@@ -238,13 +246,23 @@ def login():
         username = data.get('username')
         password = data.get('password')
         
+        print(f"🔐 Login attempt:")
+        print(f"   Received username: {username}")
+        print(f"   Received password: {'*' * len(password) if password else 'EMPTY'}")
+        print(f"   Expected username: {ADMIN_USER}")
+        print(f"   Expected password: {'*' * len(ADMIN_PASSWORD) if ADMIN_PASSWORD else 'EMPTY'}")
+        print(f"   Username match: {username == ADMIN_USER}")
+        print(f"   Password match: {password == ADMIN_PASSWORD}")
+        
         if username == ADMIN_USER and password == ADMIN_PASSWORD:
             session['logged_in'] = True
             session['username'] = username
+            print(f"✅ Login successful for user: {username}")
             if request.is_json:
                 return jsonify({'success': True, 'message': 'Login successful'})
             return redirect(url_for('index'))
         else:
+            print(f"❌ Login failed - Invalid credentials")
             if request.is_json:
                 return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
             return render_template('login.html', error='Invalid credentials')
