@@ -29,17 +29,53 @@
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .header h1 {
+        .header-content h1 {
             color: #667eea;
             margin-bottom: 10px;
             font-size: 28px;
         }
 
-        .header p {
+        .header-content p {
             color: #666;
             font-size: 14px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .user-info strong {
+            color: #667eea;
+        }
+
+        .logout-button {
+            padding: 10px 20px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .logout-button:hover {
+            background: #dc2626;
         }
 
         .stats-grid {
@@ -412,8 +448,16 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>🎛️ AgamScan Admin Panel</h1>
-            <p>Monitor document processing requests, view logs, and analyze pipeline outputs</p>
+            <div class="header-content">
+                <h1>🎛️ AgamScan Admin Panel</h1>
+                <p>Monitor document processing requests, view logs, and analyze pipeline outputs</p>
+            </div>
+            <div class="header-actions">
+                <div class="user-info">
+                    👤 <strong>{{ username }}</strong>
+                </div>
+                <a href="/logout" class="logout-button">🚪 Logout</a>
+            </div>
         </div>
 
         <!-- Statistics -->
@@ -565,6 +609,13 @@
                                     <span>Finger: ${req.quality_checks.finger?.passed ? '✅' : '❌'}</span>
                                 </div>
                             ` : ''}
+                            ${req.is_final !== null && req.is_final !== undefined ? `
+                                <div class="request-info-item">
+                                    <span class="badge ${req.is_final ? 'success' : 'info'}">
+                                        ${req.is_final ? '🎯 FINAL' : '👁️ PREVIEW'}
+                                    </span>
+                                </div>
+                            ` : ''}
                             ${req.has_ocr ? `
                                 <div class="request-info-item">
                                     <span>📝 OCR: ✅</span>
@@ -636,6 +687,16 @@
                                     </span>
                                 </div>
                             </div>
+                            ${details.is_final !== null && details.is_final !== undefined ? `
+                                <div class="detail-item">
+                                    <div class="label">🎯 Request Type</div>
+                                    <div class="value">
+                                        <span class="badge ${details.is_final ? 'success' : 'info'}">
+                                            ${details.is_final ? '🎯 FINAL SUBMISSION' : '👁️ PREVIEW MODE'}
+                                        </span>
+                                    </div>
+                                </div>
+                            ` : ''}
                             ${details.processing_time_ms ? `
                                 <div class="detail-item">
                                     <div class="label">⚡ Processing Time</div>
@@ -695,6 +756,14 @@
                                             </span>
                                             <br>Area Diff: ${details.quality_checks.finger.area_diff_ratio ? (details.quality_checks.finger.area_diff_ratio * 100).toFixed(2) + '%' : 'N/A'}
                                             <br>Threshold: ${details.quality_checks.finger.threshold ? (details.quality_checks.finger.threshold * 100).toFixed(2) + '%' : 'N/A'}
+                                            ${details.quality_checks.finger.metrics?.detection_mode ? `
+                                                <br><span class="badge info" style="margin-top: 5px; display: inline-block;">
+                                                    ${details.quality_checks.finger.metrics.detection_mode === 'mediapipe_only' ? '🖐️ MediaPipe Only' : '🔄 Hybrid Detection'}
+                                                </span>
+                                            ` : ''}
+                                            ${details.quality_checks.finger.metrics?.fingertips_detected !== undefined ? `
+                                                <br>Fingertips: ${details.quality_checks.finger.metrics.fingertips_detected ? '✅ Detected (' + (details.quality_checks.finger.metrics.fingertip_count || 0) + ')' : '❌ None'}
+                                            ` : ''}
                                         </div>
                                     </div>
                                 ` : ''}
