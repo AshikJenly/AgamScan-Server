@@ -228,7 +228,8 @@ class FingerChecker:
         self,
         polygon_points: np.ndarray,
         image_shape: tuple,
-        image: Optional[np.ndarray] = None
+        image: Optional[np.ndarray] = None,
+        is_final: bool = False
     ) -> Tuple[bool, float, str, dict]:
         """
         Check if finger is detected on card using hybrid detection:
@@ -236,75 +237,120 @@ class FingerChecker:
         2. MediaPipe hand detection (for subtle finger presence)
         
         Logic:
-        - If area difference is significant (>2.5%), always flag as finger
-        - If area difference is small (<2.5%), check for actual fingertips using MediaPipe
-        - Only flag as finger if fingertips are actually detected on card
+        - If is_final=True: ONLY use MediaPipe hand detection (skip contour-based check)
+        - If is_final=False (default): Use hybrid detection
+          - If area difference is significant (>2.5%), always flag as finger
+          - If area difference is small (<2.5%), check for actual fingertips using MediaPipe
+          - Only flag as finger if fingertips are actually detected on card
         
         Args:
             polygon_points: Polygon points from YOLO segmentation
             image_shape: Image shape
             image: Optional BGR image for hand detection
+            is_final: If True, only use MediaPipe detection (skip contour-based check)
             
         Returns:
             Tuple of (passed, area_diff_ratio, message, metrics)
         """
         try:
-            # Step 1: Check area difference
-            overlap_detected, area_diff_ratio, _, _, metrics = self.detect_finger_by_polygon_shape(
-                polygon_points,
-                image_shape
-            )
-            
-            # Initialize hand detection results
+            # Initialize variables
+            overlap_detected = False
+            area_diff_ratio = 0.0
+            metrics = {}
             fingertips_detected = False
             fingertip_count = 0
             fingertip_coords = []
             
-            # Step 2: If area difference is small but non-zero, verify with hand detection
-            if self.hand_landmarker and image is not None:
-                if area_diff_ratio > 0.005:  # Only check if there's some irregularity (>0.5%)
+            # SPECIAL MODE: If is_final=True, ONLY use MediaPipe detection
+            if is_final:
+                print("    [Finger Check] is_final=True: Using ONLY MediaPipe detection")
+                
+                # Only perform MediaPipe hand detection
+                if self.hand_landmarker and image is not None:
                     fingertips_detected, fingertip_count, fingertip_coords = self.detect_fingertips_in_polygon(
                         image,
                         polygon_points
                     )
                     
-                    # Update metrics with hand detection results
-                    metrics.update({
+                    metrics = {
                         "hand_detection_enabled": True,
                         "fingertips_detected": fingertips_detected,
-                        "fingertip_count": fingertip_count
-                    })
+                        "fingertip_count": fingertip_count,
+                        "area_diff_ratio": 0.0,
+                        "area_diff_percentage": 0.0,
+                        "detection_mode": "mediapipe_only"
+                    }
+                else:
+                    # MediaPipe not available, cannot perform check
+                    metrics = {
+                        "hand_detection_enabled": False,
+                        "detection_mode": "mediapipe_only",
+                        "error": "MediaPipe not available for is_final check"
+                    }
+                
+                # Decision: Pass only if no fingertips detected
+                passed = not fingertips_detected
+                detection_method = "hand_landmarks_only" if fingertips_detected else "no_fingers_detected"
+                
             else:
-                metrics["hand_detection_enabled"] = False
-            
-            # Decision logic:
-            # 1. If area difference is significant (>threshold), flag as finger
-            # 2. If area difference is small but fingertips are detected, flag as finger
-            # 3. Otherwise, pass
-            
-            if overlap_detected:
-                # Obvious bend/irregularity detected
-                passed = False
-                detection_method = "area_difference"
-            elif fingertips_detected:
-                # Small irregularity + actual fingertips detected
-                passed = False
-                detection_method = "hand_landmarks"
-            else:
-                # Clean card or small irregularity without fingertips
-                passed = True
-                detection_method = "both_checks_passed"
+                # NORMAL MODE: Use hybrid detection (area difference + MediaPipe)
+                # Step 1: Check area difference
+                overlap_detected, area_diff_ratio, _, _, metrics = self.detect_finger_by_polygon_shape(
+                    polygon_points,
+                    image_shape
+                )
+                
+                # Step 2: If area difference is small but non-zero, verify with hand detection
+                if self.hand_landmarker and image is not None:
+                    if area_diff_ratio > 0.005:  # Only check if there's some irregularity (>0.5%)
+                        fingertips_detected, fingertip_count, fingertip_coords = self.detect_fingertips_in_polygon(
+                            image,
+                            polygon_points
+                        )
+                        
+                        # Update metrics with hand detection results
+                        metrics.update({
+                            "hand_detection_enabled": True,
+                            "fingertips_detected": fingertips_detected,
+                            "fingertip_count": fingertip_count
+                        })
+                else:
+                    metrics["hand_detection_enabled"] = False
+                
+                # Decision logic:
+                # 1. If area difference is significant (>threshold), flag as finger
+                # 2. If area difference is small but fingertips are detected, flag as finger
+                # 3. Otherwise, pass
+                
+                if overlap_detected:
+                    # Obvious bend/irregularity detected
+                    passed = False
+                    detection_method = "area_difference"
+                elif fingertips_detected:
+                    # Small irregularity + actual fingertips detected
+                    passed = False
+                    detection_method = "hand_landmarks"
+                else:
+                    # Clean card or small irregularity without fingertips
+                    passed = True
+                    detection_method = "both_checks_passed"
             
             # Generate detailed message
             if passed:
-                if self.hand_landmarker and image is not None:
+                if is_final:
+                    message = (f"✅ No finger detected "
+                              f"(MediaPipe only: no fingertips found)")
+                elif self.hand_landmarker and image is not None:
                     message = (f"✅ No finger detected "
                               f"(area: {area_diff_ratio*100:.2f}%, no fingertips found)")
                 else:
                     message = (f"✅ No finger detected "
                               f"(area diff: {area_diff_ratio*100:.2f}%, threshold: {self.overlap_area_threshold*100:.2f}%)")
             else:
-                if detection_method == "area_difference":
+                if is_final:
+                    message = (f"🖐️ Finger detected via MediaPipe only "
+                              f"({fingertip_count} fingertip(s) on card)")
+                elif detection_method == "area_difference":
                     message = (f"🖐️ Finger detected via area difference "
                               f"({area_diff_ratio*100:.2f}% > {self.overlap_area_threshold*100:.2f}%)")
                 else:

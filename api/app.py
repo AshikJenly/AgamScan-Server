@@ -341,10 +341,12 @@ async def process_document(
         print(f"   {glare_msg} (checked on cropped card)")
         
         # Finger check - on original polygon with full image for hand detection
+        # Pass is_final parameter to control detection method
         finger_passed, finger_score, finger_msg, finger_metrics = finger_checker.check(
             polygon,
             image.shape,
-            image  # Pass full image for MediaPipe hand detection
+            image,  # Pass full image for MediaPipe hand detection
+            is_final=is_final  # If True, only use MediaPipe; if False, use hybrid detection
         )
         print(f"   {finger_msg}")
         if finger_metrics:
